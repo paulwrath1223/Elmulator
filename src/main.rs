@@ -65,21 +65,11 @@ fn main() {
         let response_slice: &[u8] = &intermediate_serial_buf[..buffer_index];
         let response_string = response_slice.iter().map(|&b| char::from(b)).collect::<String>();
         println!("Received response: {}", response_string);
-        
-        elmulator.write(&response_as_u8).expect("Failed to write to serial port");
+        let mut vec_resp: Vec<u8> = Vec::from(response_slice);
+        vec_resp.push('>' as u8);
+        elmulator.write(&vec_resp).expect("Failed to write to serial port");
     }
-
     
-
     // commands::STATIC_COMMAND_LUT
-    
-    
-    
-
-
-
-    
-    
-    
 }
 
