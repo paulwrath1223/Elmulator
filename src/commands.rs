@@ -5,122 +5,135 @@ pub struct StaticCommand {
     pub(crate) response: &'static str,
 }
 
-pub const STATIC_COMMAND_LUT: [StaticCommand; 9] = [
+pub const STATIC_COMMAND_LUT: [StaticCommand; 13] = [
     StaticCommand{
-        command: "ATZ\n",
+        command: "ATZ",
         response: "Elm 3.1 whatever\nother stuff\n\n>"
     },
     StaticCommand{
-        command: "ATE0\n",
+        command: "ATE0",
         response: "ATE0\nother stuff\n\n>"
     },
     StaticCommand{
-        command: "ATH1\n",
+        command: "ATH1",
         response: "\n\n\r>"
     },
     StaticCommand{
-        command: "ATSP5\n",
+        command: "ATSP5",
         response: "\n\n\r>"
     },
     StaticCommand{
-        command: "ATST64\n",
+        command: "ATST64",
         response: "\n\n\r>"
     },
     StaticCommand{
-        command: "ATS0\n",
+        command: "ATS0",
         response: "\n\n\r>"
     },
     StaticCommand{
-        command: "ATM0\n",
+        command: "ATM0",
         response: "\n\n\r>"
     },
     StaticCommand{
-        command: "ATAT1\n",
+        command: "ATAT1",
         response: "\n\n\r>"
     },
     StaticCommand{
-        command: "ATSH8210F0\n",
+        command: "ATSH8210F0",
         response: "\n\n\r>"
-    }
+    },
+    StaticCommand{
+        command: "210001",
+        response: "83F01061057E00000067\n\r>"
+    },
+    StaticCommand{                      // not actually static
+        command: "210501",
+        response: "83F01061057E67\n\r>"
+    },
+    StaticCommand{                      // not actually static
+        command: "210C01",
+        response: "84F010610C0000F1\n\r>"
+    },
+    StaticCommand{                      // not actually static
+        command: "ATRV",
+        response: "12.6V\n\r>"
+    },
 ];
 
+
+
+struct DynamicCommand {
+    id: DynamicCommands,
+    command_str: &'static str,
+    request: u8,
+}
+
 #[repr(u8)]
-enum DynamicCommand {
-    Heartbeat,
+enum DynamicCommands {
     GetRpm,
-    GetVoltage,
     GetCoolantTemp
 }
 
-impl Display for DynamicCommand {
+impl Display for DynamicCommands {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let str = match self {
-            DynamicCommand::Heartbeat => "210001".to_string(),
-            DynamicCommand::GetRpm => "210C01".to_string(),
-            DynamicCommand::GetVoltage => "ATRV".to_string(),
-            DynamicCommand::GetCoolantTemp => "210501".to_string(),
+            DynamicCommands::GetRpm => "210C01".to_string(),
+            DynamicCommands::GetCoolantTemp => "210501".to_string(),
         };
         write!(f, "{}", str)
     }
 }
 
-impl Debug for DynamicCommand {
+impl Debug for DynamicCommands {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         let str = match self {
-            DynamicCommand::Heartbeat => "Heartbeat: 210001".to_string(),
-            DynamicCommand::GetRpm => "GetRpm: 210C011".to_string(),
-            DynamicCommand::GetVoltage => "GetVoltage: ATRV".to_string(),
-            DynamicCommand::GetCoolantTemp => "GetCoolantTemp: 2105011".to_string(),
+            DynamicCommands::GetRpm => "GetRpm: 210C011".to_string(),
+            DynamicCommands::GetCoolantTemp => "GetCoolantTemp: 2105011".to_string(),
         };
         write!(f, "{}", str)
     }
 }
 
-pub fn generate_2_byte_kwp_response(request: u8, val: u16) -> [u8; 8] {
+pub fn generate_kwp_response(request: u8, val: &[u8]) -> Vec<u8> {
     // 84 F0 10 61 0C 00 00 F1 - num_bytes = 2, val = 0
     
-    let val_bytes: [u8; 2] = val.to_be_bytes();
-    
     let mut temp_sum:u8 = 0;
     
-    let mut response: [u8; 8] = [0x84, 0xF0, 0x10, 0x61, request, val_bytes[0], val_bytes[1], 0x00];
-    response.iter().for_each(|f| {temp_sum = temp_sum.overflowing_add(*f).0 });
-    response[7] = temp_sum;
+    let mut response: Vec<u8> = vec!(0x84, 0xF0, 0x10, 0x61, request);
+    
+    response.extend_from_slice(val);
+    
+    response.iter().for_each(|&f| {temp_sum = temp_sum.overflowing_add(f).0 });
+    response.push(temp_sum);
     response
 }
 
-pub fn generate_1_byte_kwp_response(request: u8, val: u8) -> [u8; 7] {
-    // 83 F0 10 61 05 7E 67 - num_bytes = 1, val = 0x7E
 
-    let mut temp_sum:u8 = 0;
 
-    let mut response: [u8; 7] = [0x84, 0xF0, 0x10, 0x61, request, val, 0x00];
-    response.iter().for_each(|f| {temp_sum = temp_sum.overflowing_add(*f).0 });
-    response[6] = temp_sum;
-    response
-}
+
+//31 32 2E 34 56 20 3E
 
 #[cfg(test)]
 mod tests {
     use super::*;
     #[test]
     fn test_response_generation_2_byte() {
-        let generated_result = generate_2_byte_kwp_response(0x0C, 00);
-        let actual_response: [u8; 8] = [0x84, 0xF0, 0x10, 0x61, 0x0C, 0x00, 0x00, 0xF1];
+        let generated_result = generate_kwp_response(0x0C, &0x0000u16.to_be_bytes());
+        let actual_response: Vec<u8> = vec!(0x84, 0xF0, 0x10, 0x61, 0x0C, 0x00, 0x00, 0xF1);
         assert_eq!(generated_result, actual_response, "test_response_generation_2_byte test 1 failed");
 
-        let generated_result = generate_2_byte_kwp_response(0x0C, 0x1623);
-        let actual_response: [u8; 8] = [0x84, 0xF0, 0x10, 0x61, 0x0C, 0x16, 0x23, 0x2a];
+        let generated_result = generate_kwp_response(0x0C, &0x1623u16.to_be_bytes());
+        let actual_response: Vec<u8> = vec!(0x84, 0xF0, 0x10, 0x61, 0x0C, 0x16, 0x23, 0x2a);
         assert_eq!(generated_result, actual_response, "test_response_generation_2_byte test 2 failed");
     }
     #[test]
     fn test_response_generation_1_byte() {
-        let generated_result = generate_1_byte_kwp_response(0x05, 0x7E);
-        let actual_response: [u8; 7] = [0x84, 0xF0, 0x10, 0x61, 0x05, 0x7E, 0x68];
+        let generated_result = generate_kwp_response(0x05, &0x7Eu8.to_be_bytes());
+        let actual_response: Vec<u8> = vec!(0x84, 0xF0, 0x10, 0x61, 0x05, 0x7E, 0x68);
         assert_eq!(generated_result, actual_response, "test_response_generation_1_byte test 1 failed");
 
-        let generated_result = generate_1_byte_kwp_response(0x05, 0x7D);
-        let actual_response: [u8; 7] = [0x84, 0xF0, 0x10, 0x61, 0x05, 0x7D, 0x67];
+        let generated_result = generate_kwp_response(0x05, &0x7Du8.to_be_bytes());
+        let actual_response: Vec<u8> = vec!(0x84, 0xF0, 0x10, 0x61, 0x05, 0x7D, 0x67);
         assert_eq!(generated_result, actual_response, "test_response_generation_1_byte test 2 failed");
     }
 }

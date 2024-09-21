@@ -1,8 +1,10 @@
 mod commands;
-
+// mod testing_stuff;
+mod errors;
 
 use std::io;
 use std::io::Write;
+use crate::commands::STATIC_COMMAND_LUT;
 
 const DELIMETER: char = '\r';
 const SERIAL_BUFFER_LEN: usize = 1024;
@@ -64,10 +66,22 @@ fn main() {
 
         let response_slice: &[u8] = &intermediate_serial_buf[..buffer_index];
         let response_string = response_slice.iter().map(|&b| char::from(b)).collect::<String>();
-        println!("Received response: {}", response_string);
-        let mut vec_resp: Vec<u8> = Vec::from(response_slice);
-        vec_resp.push('>' as u8);
-        elmulator.write(&vec_resp).expect("Failed to write to serial port");
+        
+        let mut response_sent: bool = false;
+        
+        for pid in STATIC_COMMAND_LUT{
+            if pid.command == response_string.trim(){
+                println!("sanctioned command received: {}\nresponding with {}", pid.command, pid.response);
+                elmulator.write(pid.response.as_bytes()).expect("Failed to write to serial port");
+                response_sent = true;
+                break
+            }
+        }
+        
+        if !response_sent{
+            println!("Received unknown response: {:?}\n hitting them with the {:?}", response_string, default_response_chars);
+            elmulator.write(&response_as_u8).expect("Failed to write to serial port");
+        }
     }
     
     // commands::STATIC_COMMAND_LUT

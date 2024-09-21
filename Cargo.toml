@@ -5,3 +5,4 @@ edition = "2021"
 
 [dependencies]
 serialport = "4.5.0"
+thiserror-no-std = "2.0.2"
